@@ -29,4 +29,71 @@ describe Place do
     end
   end
 
+  shared_examples 'rating compuration' do
+    let(:place) { Place.new }
+    subject { place.update_rate(rate, true) }
+    context "when value.abs > #{Place::MAX_RATING}" do
+      let(:value) { 10 }
+
+      it 'raise an ArgumentError' do
+        expect { subject }.to raise_error(ArgumentError)
+      end
+    end
+  end
+
+  describe 'compute_rate!(value)' do
+    let(:value) { 1.0 }
+    let(:rate)  { 3.5 }
+    let(:reviews_count) { 10 }
+    let(:place) { Place.new }
+
+    subject { place.rate }
+
+    before do
+      place.rate = rate
+      place.stub(:with_lock).and_yield
+      place.stub(:number_of_reviews).and_return(reviews_count)
+      place.stub(:save!).and_return(true)
+    end
+
+    context 'when not new_record' do
+      let(:computed_rate_for_persisted_record) { (rate * (reviews_count-1)) + value / reviews_count }
+
+      before { place.stub(:new_record?).and_return(false) }
+
+      it "should increase the rate by 1.0" do
+        place.compute_rate!(value)
+        subject.should == computed_rate_for_persisted_record
+      end
+
+      context 'when value < 0' do
+        let(:value) { -3.0 }
+
+        it 'decrease the rate' do
+          place.compute_rate!(value)
+          subject.should == computed_rate_for_persisted_record
+        end
+      end
+    end
+
+    context 'when place is new record' do
+      let(:computed_rate_for_new_record) { (rate * reviews_count) + value / reviews_count + 1 }
+
+      before { place.stub(:new_record?).and_return(true) }
+
+      it "should increase the rate by 1.0" do
+        place.compute_rate!(value)
+        subject.should == computed_rate_for_new_record
+      end
+
+      context 'when value < 0' do
+        let(:value) { -3.0 }
+
+        it 'decrease the rate' do
+          place.compute_rate!(value)
+          subject.should ==  computed_rate_for_new_record
+        end
+      end
+    end
+  end
 end

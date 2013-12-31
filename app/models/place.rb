@@ -8,6 +8,7 @@ class Place < ActiveRecord::Base
   validates :latitude, :longitude, numericality: true
 
   RADIUS = [0.1,0.3,0.6,1.0,1.5,2.0,3.0,5.0]
+  MAX_RATING = 5.0
 
   def self.popular
     ids_array = JSON.parse(Information.find_by(name:'popular_places').value)
@@ -18,6 +19,21 @@ class Place < ActiveRecord::Base
   def self.close(latitude,longitude,radius)
     raise ArgumentError, "The radius is not correct" unless RADIUS.map(&:to_s).include? radius
     self.near([latitude,longitude], radius)
+  end
+
+  def compute_rate!(value)
+    value = Float(value)
+    raise ArgumentError, "Please provide a max rating of #{MAX_RATING}" if value.abs > 5.0
+
+    self.with_lock do
+      if self.new_record?
+        self.rate = (self.rate * self.number_of_reviews) + value / self.number_of_reviews + 1
+      else
+        self.rate = (self.rate * (self.number_of_reviews-1)) + value / [1, self.number_of_reviews].max
+      end
+
+      self.save!
+    end
   end
 
   def update_rate(rate, incr)
