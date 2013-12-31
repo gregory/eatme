@@ -21,8 +21,7 @@ class Place < ActiveRecord::Base
   end
 
   def compute_avg!
-    self.with_lock do
-      self.rate = self.reviews.average(:note)
-    end
+    self.rate = self.reviews.average(:note)
+    self.save!
   end
 end
